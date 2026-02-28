@@ -5,10 +5,11 @@
 - "分析视频起标题" / "/titles"
 
 ## 核心功能
-1. **视频分析**: 不限大小，快速提取视频内容主题
+1. **视频/字幕分析**: 支持视频文件或字幕文件，快速提取内容主题
 2. **多选标题**: 每个平台生成3个风格不同的标题供选择
-3. **学习偏好**: 记录用户的选择，优化未来推荐
+3. **智能偏好学习**: 记录选择和编辑，分析风格模式，持续优化推荐
 4. **参考资料**: 支持导入用户现有标题库作为风格参考
+5. **发布工具集成**: 与 social-auto-upload 项目共享偏好数据
 
 ---
 
@@ -241,32 +242,56 @@ AI: (生成3个非测评型标题)
 
 ## 学习用户偏好
 
-### 偏好文件
-`~/.claude/skills/video-title-generator/preferences.json`
+### 数据来源
+偏好数据与 **social-auto-upload** 项目共享，支持两个位置：
+1. `~/.claude/skills/video-title-generator/preferences.json` (skill 本地)
+2. `~/Desktop/vibe-coding/social-auto-upload/data/title_history.json` (发布工具)
 
+### 偏好数据结构
 ```json
 {
-  "history": [
+  "selections": [
     {
-      "date": "2026-02-28",
+      "timestamp": "2026-02-28T23:30:00",
+      "platform": "douyin",
       "topic": "AI工具教程",
-      "choices": {"douyin": "A", "bilibili": "C", "xiaohongshu": "B"}
+      "original_titles": ["标题A", "标题B", "标题C"],
+      "selected": "标题A",
+      "edited": "标题A（用户修改版）",
+      "was_edited": true
     }
   ],
-  "style_weights": {
-    "douyin": {"A": 5, "B": 2, "C": 3},
-    "bilibili": {"A": 3, "B": 1, "C": 6}
-  },
-  "favorite_words": ["保姆级", "干货", "必看", "神器"],
-  "avoid_words": ["震惊", "不转不是中国人"]
+  "stats": {
+    "total_selections": 15,
+    "edit_rate": 40.0,
+    "platform_preferences": {
+      "douyin": {
+        "common_words": ["效率", "神器", "教程"],
+        "sample_titles": ["最近用户选择的标题"]
+      }
+    },
+    "avg_length": {"douyin": 18, "xiaohongshu": 12},
+    "style_patterns": {
+      "uses_emoji": true,
+      "uses_brackets": true,
+      "uses_question": false,
+      "uses_exclamation": true
+    }
+  }
 }
 ```
 
 ### 学习机制
-- 记录每次选择，累计风格权重
-- 提取用户常用词汇加入推荐
-- 将用户偏好风格排在第一位
-- 可随时查看/重置偏好
+- **选择追踪**: 记录每次选择的原始选项和最终编辑结果
+- **编辑率分析**: 高编辑率时，AI 会生成更贴近用户风格的标题
+- **常用词提取**: 自动从用户编辑中提取高频词汇
+- **风格模式识别**: 检测 emoji、括号、问句、感叹句等使用习惯
+- **平均长度学习**: 每个平台记录用户偏好的标题长度
+- **样本标题参考**: 用最近选择的标题作为风格示例
+
+### 触发词查看/重置
+- "查看偏好" / "我的标题风格"
+- "重置偏好" / "清除学习记录"
 
 ---
 
@@ -342,6 +367,32 @@ gemini "分析以下标题的风格特点，提取：
 每个标题后标注字数，确保严格遵守字数限制。
 三个风格必须有明显区分，不能太相似。
 ```
+
+---
+
+## 与 social-auto-upload 集成
+
+### 数据同步
+当在 Claude Code 中使用此 skill 生成标题时，偏好数据会自动与发布工具共享：
+
+```bash
+# skill 本地偏好
+~/.claude/skills/video-title-generator/preferences.json
+
+# 发布工具偏好（如果存在）
+~/Desktop/vibe-coding/social-auto-upload/data/title_history.json
+```
+
+### 同步机制
+1. **读取时合并**: 生成标题时读取两个位置的偏好数据
+2. **写入时同步**: 记录选择时同时写入两个位置
+3. **冲突处理**: 以最新时间戳为准
+
+### API 集成
+发布工具提供 REST API：
+- `POST /ai/generateFromSubtitle` - 从字幕生成标题
+- `POST /ai/recordTitleSelection` - 记录选择
+- `GET /ai/getTitleStats` - 获取偏好统计
 
 ---
 
